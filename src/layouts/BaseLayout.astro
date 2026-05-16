@@ -1,6 +1,14 @@
 ---
 import '../styles/global.css';
-import { SITE_TITLE, SITE_DESCRIPTION, SITE_URL } from '../consts';
+import {
+  SITE_TITLE,
+  SITE_DESCRIPTION,
+  SITE_URL,
+  OG_IMAGE,
+  PARENT,
+  PROFILES,
+  FAQ,
+} from '../consts';
 
 interface Props {
   title?: string;
@@ -11,6 +19,61 @@ const { title, description } = Astro.props;
 const pageTitle = title ?? SITE_TITLE;
 const pageDescription = description ?? SITE_DESCRIPTION;
 const canonical = new URL(Astro.url.pathname, SITE_URL).toString();
+const ogImage = new URL(OG_IMAGE, SITE_URL).toString();
+
+// schema.org graph — tells AI answer engines what this site is, who is
+// behind it, and how to cite it. The Organization node carries `sameAs`
+// links so engines can resolve kant.dev against the wider entity graph.
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebApplication',
+      '@id': SITE_URL + '/#app',
+      name: SITE_TITLE,
+      url: SITE_URL + '/',
+      description: pageDescription,
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web browser',
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+      isPartOf: { '@id': SITE_URL + '/#website' },
+      publisher: { '@id': PARENT.url + '/#org' },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': SITE_URL + '/#website',
+      name: SITE_TITLE,
+      url: SITE_URL + '/',
+      description: SITE_DESCRIPTION,
+      inLanguage: 'en',
+      publisher: { '@id': PARENT.url + '/#org' },
+    },
+    {
+      '@type': 'Organization',
+      '@id': PARENT.url + '/#org',
+      name: PARENT.name,
+      url: PARENT.url,
+      description:
+        'Technical partner for AI, MDM/PIM and business automation.',
+      logo: SITE_URL + '/favicon.svg',
+      founder: {
+        '@type': 'Person',
+        name: 'Philipp Kant',
+        url: 'https://philippkant.com',
+      },
+      sameAs: PROFILES,
+    },
+    {
+      '@type': 'FAQPage',
+      '@id': SITE_URL + '/#faq',
+      mainEntity: FAQ.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    },
+  ],
+};
 ---
 
 <!doctype html>
@@ -24,12 +87,21 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).toString();
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_TITLE} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={pageDescription} />
     <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`${SITE_TITLE} — ${SITE_DESCRIPTION}`} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={pageDescription} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+
     <script
       defer
       src="https://umami.kant.dev/script.js"

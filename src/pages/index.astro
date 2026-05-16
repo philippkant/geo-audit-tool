@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE_TAGLINE, PARENT, CTA, SOURCES } from '../consts';
+import { SITE_TAGLINE, PARENT, CTA, SOURCES, FAQ } from '../consts';
 
 // Homepage is static — only /api/audit runs on demand.
 export const prerender = true;
@@ -114,6 +114,23 @@ export const prerender = true;
         {CTA.label}
         <span aria-hidden="true">→</span>
       </a>
+    </section>
+
+    <!-- FAQ — also emitted as FAQPage JSON-LD in the layout -->
+    <section class="mt-14 border-t border-[var(--color-rule)] pt-10">
+      <h2 class="font-display text-[1.4rem] text-[var(--color-ink)]">Frequently asked</h2>
+      <dl class="mt-6 space-y-6">
+        {
+          FAQ.map((f) => (
+            <div>
+              <dt class="text-[1rem] font-semibold text-[var(--color-ink)]">{f.q}</dt>
+              <dd class="mt-1.5 max-w-2xl text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
+                {f.a}
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
     </section>
 
     <!-- Further reading -->
