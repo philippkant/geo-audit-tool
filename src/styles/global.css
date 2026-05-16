@@ -1,0 +1,143 @@
+@import "@fontsource-variable/fraunces/full.css";
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Fraunces Variable", "Source Serif 4", Charter, Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, monospace;
+
+  /* Warm paper palette — shared with kant.dev */
+  --color-paper: #f7f1e6;
+  --color-paper-soft: #fdf9f0;
+  --color-paper-deep: #ede2cf;
+  --color-ink: #161e2f;
+  --color-ink-soft: #3a4258;
+  --color-muted: #7d7363;
+  --color-rule: #e6dcc7;
+
+  /* Coral accent */
+  --color-accent: #e76a52;
+  --color-accent-hover: #cf553e;
+  --color-accent-soft: #f7c7bb;
+  --color-accent-tint: #fbe5dd;
+
+  /* Status palette for audit results */
+  --color-pass: #2f8f5b;
+  --color-warn: #c98a1e;
+  --color-fail: #cf553e;
+}
+
+/* Dark mode follows the OS — no toggle needed for a single-purpose tool */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #161310;
+    --color-paper-soft: #1f1b16;
+    --color-paper-deep: #100e0c;
+    --color-ink: #f1e8d8;
+    --color-ink-soft: #d8cdb8;
+    --color-muted: #968a76;
+    --color-rule: #2c2620;
+    --color-accent-tint: #2a1c17;
+    --color-pass: #5cbf86;
+    --color-warn: #e0ad52;
+    --color-fail: #e8836b;
+  }
+}
+
+html {
+  color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
+  font-feature-settings: "ss01", "cv11";
+  font-size: 17px;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display serif, matches kant.dev hero treatment */
+.font-display {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  letter-spacing: -0.02em;
+}
+
+/* Pill eyebrow badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-accent-soft);
+  background: var(--color-paper-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+/* Signature coral period */
+.dot::after {
+  content: ".";
+  color: var(--color-accent);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Spinner used while an audit runs */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  animation: spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .spinner {
+    animation: none;
+  }
+}

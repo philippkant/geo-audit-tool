@@ -1,0 +1,279 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE_TAGLINE, PARENT } from '../consts';
+
+// Homepage is static — only /api/audit runs on demand.
+export const prerender = true;
+---
+
+<BaseLayout>
+  <main class="mx-auto max-w-3xl px-6 py-14 sm:py-20">
+    <!-- Hero -->
+    <section class="rise">
+      <span class="badge">AI Visibility Audit</span>
+      <h1
+        class="font-display dot mt-6 text-[clamp(2.1rem,6vw,3.3rem)] leading-[1.05] text-[var(--color-ink)]"
+      >
+        Is your site visible to AI?
+      </h1>
+      <p class="mt-5 max-w-xl text-[1.1rem] leading-[1.6] text-[var(--color-ink-soft)]">
+        {SITE_TAGLINE} Enter a URL and get a free report on how ChatGPT, Perplexity,
+        Google AI Overviews and Copilot can crawl, understand and cite it.
+      </p>
+
+      <!-- Audit form -->
+      <form id="audit-form" class="mt-8 flex flex-col gap-3 sm:flex-row" novalidate>
+        <input
+          id="url-input"
+          type="text"
+          name="url"
+          inputmode="url"
+          autocomplete="url"
+          placeholder="yourdomain.com"
+          aria-label="Website URL to audit"
+          class="min-w-0 flex-1 rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-soft)] px-5 py-3.5 text-[1rem] text-[var(--color-ink)] outline-none transition-colors placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)]"
+        />
+        <button
+          id="audit-btn"
+          type="submit"
+          class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--color-accent)] px-6 py-3.5 text-[1rem] font-semibold text-white transition-colors hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span id="btn-label">Run audit</span>
+        </button>
+      </form>
+      <p id="form-error" class="mt-3 hidden text-[0.92rem] font-medium text-[var(--color-fail)]"></p>
+
+      <p class="mt-4 text-[0.86rem] text-[var(--color-muted)]">
+        Checks AI crawler access, structured data and content extractability. No signup, nothing stored.
+      </p>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="mt-12 hidden" aria-live="polite"></section>
+
+    <!-- What we check (shown before first run) -->
+    <section id="explainer" class="mt-14 border-t border-[var(--color-rule)] pt-10">
+      <h2 class="font-display text-[1.4rem] text-[var(--color-ink)]">What this checks</h2>
+      <div class="mt-6 grid gap-5 sm:grid-cols-3">
+        <div>
+          <h3 class="text-[1rem] font-semibold text-[var(--color-ink)]">AI crawler access</h3>
+          <p class="mt-1.5 text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
+            Whether robots.txt lets GPTBot, ClaudeBot, PerplexityBot and others reach your content.
+          </p>
+        </div>
+        <div>
+          <h3 class="text-[1rem] font-semibold text-[var(--color-ink)]">Structured data</h3>
+          <p class="mt-1.5 text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
+            Schema.org markup that tells AI engines what entity you are and how to cite you.
+          </p>
+        </div>
+        <div>
+          <h3 class="text-[1rem] font-semibold text-[var(--color-ink)]">Content & extractability</h3>
+          <p class="mt-1.5 text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
+            Titles, headings and real server-rendered text that AI engines can quote.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-16 border-t border-[var(--color-rule)] pt-6 text-[0.88rem] text-[var(--color-muted)]">
+      <p>
+        A <a
+          href={PARENT.url}
+          class="font-semibold text-[var(--color-ink-soft)] underline decoration-[var(--color-accent-soft)] underline-offset-2 hover:decoration-[var(--color-accent)]"
+          >{PARENT.name}</a
+        > product — technical partner for AI, MDM/PIM and business automation.
+      </p>
+    </footer>
+  </main>
+</BaseLayout>
+
+<style>
+  .gauge {
+    position: relative;
+    width: 116px;
+    height: 116px;
+    flex: none;
+    border-radius: 9999px;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(
+      var(--gauge-color) calc(var(--gauge-pct) * 1%),
+      var(--color-rule) 0
+    );
+  }
+  .gauge__hole {
+    width: 86px;
+    height: 86px;
+    border-radius: 9999px;
+    background: var(--color-paper);
+    display: grid;
+    place-items: center;
+    line-height: 1;
+  }
+  .gauge__num {
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  .check-fix {
+    border-left: 2px solid var(--color-accent-soft);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .gauge {
+      transition: background 0.6s ease;
+    }
+  }
+</style>
+
+<script>
+  import type { AuditResult, Category, Check, CheckStatus } from '../lib/audit';
+
+  const form = document.getElementById('audit-form') as HTMLFormElement;
+  const input = document.getElementById('url-input') as HTMLInputElement;
+  const btn = document.getElementById('audit-btn') as HTMLButtonElement;
+  const btnLabel = document.getElementById('btn-label') as HTMLSpanElement;
+  const errorEl = document.getElementById('form-error') as HTMLParagraphElement;
+  const results = document.getElementById('results') as HTMLElement;
+  const explainer = document.getElementById('explainer') as HTMLElement;
+
+  const STATUS: Record<CheckStatus, { icon: string; color: string; label: string }> = {
+    pass: { icon: '✓', color: 'var(--color-pass)', label: 'Pass' },
+    warn: { icon: '!', color: 'var(--color-warn)', label: 'Improve' },
+    fail: { icon: '✕', color: 'var(--color-fail)', label: 'Fix' },
+  };
+
+  function esc(s: string): string {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function bandColor(band: AuditResult['band']): string {
+    if (band === 'strong') return 'var(--color-pass)';
+    if (band === 'fair') return 'var(--color-warn)';
+    return 'var(--color-fail)';
+  }
+
+  function bandLabel(band: AuditResult['band']): string {
+    if (band === 'strong') return 'Strong';
+    if (band === 'fair') return 'Fair';
+    return 'Needs work';
+  }
+
+  function renderCheck(check: Check): string {
+    const s = STATUS[check.status];
+    const fix =
+      check.status === 'pass'
+        ? ''
+        : `<p class="check-fix mt-2 pl-3 text-[0.9rem] leading-[1.5] text-[var(--color-ink-soft)]">
+             <span class="font-semibold text-[var(--color-ink)]">Fix:</span> ${esc(check.fix)}
+           </p>`;
+    return `
+      <li class="border-t border-[var(--color-rule)] py-4 first:border-t-0">
+        <div class="flex items-start gap-3">
+          <span
+            class="mt-0.5 grid size-5 flex-none place-items-center rounded-full text-[0.7rem] font-bold text-white"
+            style="background:${s.color}"
+            aria-hidden="true"
+          >${s.icon}</span>
+          <div class="min-w-0">
+            <p class="text-[0.98rem] font-semibold text-[var(--color-ink)]">${esc(check.label)}</p>
+            <p class="mt-0.5 text-[0.9rem] leading-[1.5] text-[var(--color-ink-soft)]">${esc(check.detail)}</p>
+            ${fix}
+          </div>
+        </div>
+      </li>`;
+  }
+
+  function renderCategory(cat: Category): string {
+    return `
+      <div class="mt-8">
+        <div class="flex items-baseline justify-between gap-4">
+          <h3 class="font-display text-[1.25rem] text-[var(--color-ink)]">${esc(cat.title)}</h3>
+          <span class="font-mono text-[0.85rem] font-semibold text-[var(--color-muted)]">${cat.score}/100</span>
+        </div>
+        <p class="mt-1 text-[0.9rem] text-[var(--color-muted)]">${esc(cat.blurb)}</p>
+        <ul class="mt-3 rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-soft)] px-5">
+          ${cat.checks.map(renderCheck).join('')}
+        </ul>
+      </div>`;
+  }
+
+  function renderResult(r: AuditResult): string {
+    const when = new Date(r.fetchedAt).toLocaleString();
+    return `
+      <div class="rise rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-soft)] p-6 sm:p-8">
+        <div class="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+          <div class="gauge" style="--gauge-pct:${r.score};--gauge-color:${bandColor(r.band)}">
+            <div class="gauge__hole"><span class="gauge__num">${r.score}</span></div>
+          </div>
+          <div class="min-w-0">
+            <p class="text-[0.78rem] font-semibold uppercase tracking-[0.16em]" style="color:${bandColor(r.band)}">
+              ${bandLabel(r.band)} AI visibility
+            </p>
+            <p class="mt-1.5 text-[1.05rem] leading-[1.5] text-[var(--color-ink)]">${esc(r.summary)}</p>
+            <p class="mt-2 break-all text-[0.85rem] text-[var(--color-muted)]">${esc(r.url)} · audited ${esc(when)}</p>
+          </div>
+        </div>
+      </div>
+      ${r.categories.map(renderCategory).join('')}
+      <p class="mt-8 text-[0.88rem] text-[var(--color-muted)]">
+        This is a technical, deterministic audit. It does not yet test whether an AI model
+        already knows your brand — that is coming as a separate check.
+      </p>`;
+  }
+
+  function showError(msg: string): void {
+    errorEl.textContent = msg;
+    errorEl.classList.remove('hidden');
+  }
+
+  function setLoading(loading: boolean): void {
+    btn.disabled = loading;
+    input.disabled = loading;
+    btnLabel.textContent = loading ? 'Auditing…' : 'Run audit';
+    if (loading) {
+      btn.insertAdjacentHTML(
+        'afterbegin',
+        '<span class="spinner" aria-hidden="true"></span>',
+      );
+    } else {
+      btn.querySelector('.spinner')?.remove();
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.classList.add('hidden');
+    const url = input.value.trim();
+    if (!url) {
+      showError('Enter a website URL.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showError(typeof data?.error === 'string' ? data.error : 'Audit failed. Try again.');
+        return;
+      }
+      explainer.classList.add('hidden');
+      results.innerHTML = renderResult(data as AuditResult);
+      results.classList.remove('hidden');
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      showError('Network error — could not reach the audit service.');
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
