@@ -7,7 +7,10 @@
 
 import { parse, type HTMLElement } from 'node-html-parser';
 
-export type CheckStatus = 'pass' | 'warn' | 'fail';
+// 'info' is a non-scored, neutral note — used where a check is genuinely
+// informational rather than a pass/fail signal (e.g. llms.txt, which Google
+// says is not required).
+export type CheckStatus = 'pass' | 'warn' | 'fail' | 'info';
 
 export interface Check {
   id: string;
@@ -261,9 +264,11 @@ function earned(c: Check): number {
 }
 
 function scoreOf(checks: Check[]): number {
-  const total = checks.reduce((s, c) => s + c.weight, 0);
+  // 'info' checks are notes, not signals — they never affect the score.
+  const scored = checks.filter((c) => c.status !== 'info');
+  const total = scored.reduce((s, c) => s + c.weight, 0);
   if (total === 0) return 0;
-  const got = checks.reduce((s, c) => s + earned(c), 0);
+  const got = scored.reduce((s, c) => s + earned(c), 0);
   return Math.round((got / total) * 100);
 }
 
@@ -319,18 +324,46 @@ export async function runAudit(url: string): Promise<AuditResult> {
         : 'Allow the remaining AI crawlers in robots.txt unless you have a deliberate reason to block them.',
   };
 
+  // Indexability — a noindex page is kept out of Search, and therefore out
+  // of AI Overviews and AI Mode. Google's AI optimization guide treats Search
+  // indexing as a hard prerequisite for any AI feature.
+  const robotsMetas = root.querySelectorAll(
+    'meta[name="robots"], meta[name="googlebot"]',
+  );
+  const noindex = robotsMetas.some((m) =>
+    /\bnoindex\b/i.test(m.getAttribute('content') || ''),
+  );
+  const noindexCheck: Check = {
+    id: 'indexable',
+    label: 'Page is indexable (no noindex)',
+    weight: 3,
+    status: noindex ? 'fail' : 'pass',
+    detail: noindex
+      ? 'A robots meta tag sets "noindex" — this page is kept out of Google Search, and so out of AI Overviews and AI Mode.'
+      : 'No "noindex" robots meta tag — the page is eligible to be indexed.',
+    fix:
+      'Remove the noindex directive from the robots meta tag. Google\'s AI ' +
+      'optimization guide is explicit: a page must be indexable in Search ' +
+      'before it can appear in any AI feature.',
+  };
+
   const llmsOk = llmsR.status === 'fulfilled' && llmsR.value.ok && llmsR.value.text.trim().length > 0;
   const llmsCheck: Check = {
     id: 'llms-txt',
-    label: 'llms.txt guide for AI engines',
+    label: 'llms.txt index for AI engines',
     weight: 1,
-    status: llmsOk ? 'pass' : 'warn',
+    // Informational only — does not affect the score. Google's AI
+    // optimization guide explicitly states llms.txt is not needed for its
+    // AI features; some independent crawlers still read it.
+    status: 'info',
     detail: llmsOk
-      ? 'Found /llms.txt — a curated map of your key content for AI engines.'
-      : 'No /llms.txt found.',
-    fix:
-      'Add an /llms.txt file: a short Markdown index of your most important pages. ' +
-      'It is an emerging standard that helps AI engines find and prioritise your best content.',
+      ? 'Found /llms.txt — a curated Markdown index of key pages. Note: ' +
+        "Google's AI optimization guide says llms.txt is not required for " +
+        'its AI features, so treat it as an optional, emerging signal.'
+      : 'No /llms.txt found. This is informational only — Google\'s AI ' +
+        'optimization guide explicitly says llms.txt and AI-specific files ' +
+        'are not needed. Some independent tools still read it.',
+    fix: '',
   };
 
   const hasSitemap =
@@ -358,7 +391,7 @@ export async function runAudit(url: string): Promise<AuditResult> {
     id: 'crawl',
     title: 'AI crawler access',
     blurb: 'Whether AI answer engines can reach and index your content at all.',
-    checks: [crawlerCheck, llmsCheck, sitemapCheck],
+    checks: [crawlerCheck, noindexCheck, sitemapCheck, llmsCheck],
     score: 0,
   };
   crawlCategory.score = scoreOf(crawlCategory.checks);
@@ -557,9 +590,130 @@ export async function runAudit(url: string): Promise<AuditResult> {
   };
   contentCategory.score = scoreOf(contentCategory.checks);
 
+  /* --- Category 4: Agent readiness --- */
+
+  // How well AI browser agents — which read the DOM and the accessibility
+  // tree, not just the visual render — can perceive and operate the page.
+  // See web.dev/articles/ai-agent-site-ux.
+
+  const hasMain = root.querySelectorAll('main').length > 0;
+  const hasNavOrHeader =
+    root.querySelectorAll('nav').length > 0 || root.querySelectorAll('header').length > 0;
+  const landmarkCheck: Check = {
+    id: 'landmarks',
+    label: 'Semantic landmarks mark out the page',
+    weight: 1,
+    status: hasMain && hasNavOrHeader ? 'pass' : hasMain || hasNavOrHeader ? 'warn' : 'fail',
+    detail:
+      (hasMain ? 'A <main> landmark is present' : 'No <main> landmark') +
+      (hasNavOrHeader
+        ? ' and <nav>/<header> structure is present.'
+        : '; no <nav>/<header> structure.'),
+    fix:
+      'Wrap the primary content in <main> and use <nav>/<header>/<footer>. ' +
+      'Agents use these landmarks to tell main content apart from navigation.',
+  };
+
+  // Anchors with no real destination are invisible as links in the
+  // accessibility tree that agents rely on.
+  const anchors = root.querySelectorAll('a');
+  const deadAnchors = anchors.filter((a) => {
+    const href = (a.getAttribute('href') || '').trim();
+    return !href || href === '#' || href.toLowerCase().startsWith('javascript:');
+  });
+  const buttonCount = root.querySelectorAll('button').length;
+  const controlsCheck: Check = {
+    id: 'semantic-controls',
+    label: 'Links and buttons are real interactive elements',
+    weight: 2,
+    status: deadAnchors.length === 0 ? 'pass' : deadAnchors.length <= 3 ? 'warn' : 'fail',
+    detail:
+      `${anchors.length} link(s) and ${buttonCount} <button> element(s) found; ` +
+      (deadAnchors.length === 0
+        ? 'every <a> has a real destination.'
+        : `${deadAnchors.length} <a> tag(s) have no usable href (empty, "#" or javascript:).`),
+    fix:
+      'Use <a href> for navigation and <button> for actions, not <div>/<span>. ' +
+      'Agents recognise native elements as interactive; placeholder anchors are not.',
+  };
+
+  // Form fields need a programmatic name to appear in the accessibility tree.
+  const labelEls = root.querySelectorAll('label');
+  const labelFor = new Set<string>();
+  const wrappedFields = new Set<HTMLElement>();
+  for (const l of labelEls) {
+    const f = (l.getAttribute('for') || '').trim();
+    if (f) labelFor.add(f);
+    for (const c of l.querySelectorAll('input, select, textarea')) wrappedFields.add(c);
+  }
+  const SKIP_INPUT = ['hidden', 'submit', 'button', 'image', 'reset'];
+  const fields = root
+    .querySelectorAll('input, select, textarea')
+    .filter((el) => !SKIP_INPUT.includes((el.getAttribute('type') || '').toLowerCase()));
+  const unlabelledFields = fields.filter((el) => {
+    if ((el.getAttribute('aria-label') || '').trim()) return false;
+    if ((el.getAttribute('aria-labelledby') || '').trim()) return false;
+    const id = (el.getAttribute('id') || '').trim();
+    if (id && labelFor.has(id)) return false;
+    return !wrappedFields.has(el);
+  });
+  const labelCheck: Check = {
+    id: 'form-labels',
+    label: 'Form fields have associated labels',
+    weight: 1,
+    status:
+      fields.length === 0 || unlabelledFields.length === 0
+        ? 'pass'
+        : unlabelledFields.length <= 2
+          ? 'warn'
+          : 'fail',
+    detail:
+      fields.length === 0
+        ? 'No form fields on this page.'
+        : unlabelledFields.length === 0
+          ? `All ${fields.length} form field(s) carry a label, aria-label or aria-labelledby.`
+          : `${unlabelledFields.length} of ${fields.length} form field(s) have no associated label.`,
+    fix:
+      'Tie every input to a <label for> (or give it an aria-label). Without a ' +
+      'name, an agent cannot tell what a field is for.',
+  };
+
+  const images = root.querySelectorAll('img');
+  const noAltImages = images.filter((img) => img.getAttribute('alt') == null);
+  const altCheck: Check = {
+    id: 'image-alt',
+    label: 'Images carry alt text',
+    weight: 1,
+    status:
+      images.length === 0 || noAltImages.length === 0
+        ? 'pass'
+        : noAltImages.length <= 3
+          ? 'warn'
+          : 'fail',
+    detail:
+      images.length === 0
+        ? 'No <img> elements on this page.'
+        : noAltImages.length === 0
+          ? `All ${images.length} image(s) have an alt attribute.`
+          : `${noAltImages.length} of ${images.length} image(s) have no alt attribute.`,
+    fix:
+      'Give every <img> an alt attribute (use alt="" for purely decorative ' +
+      'images). Alt text is the name an agent sees in the accessibility tree.',
+  };
+
+  const agentCategory: Category = {
+    id: 'agent',
+    title: 'Agent readiness',
+    blurb:
+      'Whether AI browser agents — which read the DOM and accessibility tree — can perceive and operate the page.',
+    checks: [landmarkCheck, controlsCheck, labelCheck, altCheck],
+    score: 0,
+  };
+  agentCategory.score = scoreOf(agentCategory.checks);
+
   /* --- Overall --- */
 
-  const categories = [crawlCategory, schemaCategory, contentCategory];
+  const categories = [crawlCategory, schemaCategory, contentCategory, agentCategory];
   const allChecks = categories.flatMap((c) => c.checks);
   const score = scoreOf(allChecks);
   const band: AuditResult['band'] = score >= 75 ? 'strong' : score >= 50 ? 'fair' : 'weak';

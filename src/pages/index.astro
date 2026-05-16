@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE_TAGLINE, PARENT, CTA } from '../consts';
+import { SITE_TAGLINE, PARENT, CTA, SOURCES } from '../consts';
 
 // Homepage is static — only /api/audit runs on demand.
 export const prerender = true;
@@ -67,11 +67,12 @@ export const prerender = true;
     <!-- What we check (shown before first run) -->
     <section id="explainer" class="mt-14 border-t border-[var(--color-rule)] pt-10">
       <h2 class="font-display text-[1.4rem] text-[var(--color-ink)]">What this checks</h2>
-      <div class="mt-6 grid gap-5 sm:grid-cols-3">
+      <div class="mt-6 grid gap-5 sm:grid-cols-2">
         <div>
           <h3 class="text-[1rem] font-semibold text-[var(--color-ink)]">AI crawler access</h3>
           <p class="mt-1.5 text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
-            Whether robots.txt lets GPTBot, ClaudeBot, PerplexityBot and others reach your content.
+            Whether robots.txt and indexing rules let GPTBot, ClaudeBot, PerplexityBot and
+            Google reach and index your content.
           </p>
         </div>
         <div>
@@ -84,6 +85,13 @@ export const prerender = true;
           <h3 class="text-[1rem] font-semibold text-[var(--color-ink)]">Content & extractability</h3>
           <p class="mt-1.5 text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
             Titles, headings and real server-rendered text that AI engines can quote.
+          </p>
+        </div>
+        <div>
+          <h3 class="text-[1rem] font-semibold text-[var(--color-ink)]">Agent readiness</h3>
+          <p class="mt-1.5 text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
+            Semantic landmarks, real controls and labelled fields that AI browser agents
+            need to operate the page.
           </p>
         </div>
       </div>
@@ -106,6 +114,31 @@ export const prerender = true;
         {CTA.label}
         <span aria-hidden="true">→</span>
       </a>
+    </section>
+
+    <!-- Further reading -->
+    <section class="mt-14 border-t border-[var(--color-rule)] pt-10">
+      <h2 class="font-display text-[1.4rem] text-[var(--color-ink)]">Further reading</h2>
+      <p class="mt-2 max-w-xl text-[0.92rem] leading-[1.55] text-[var(--color-ink-soft)]">
+        These checks follow current guidance from Google and the Chrome team:
+      </p>
+      <ul class="mt-5 space-y-4">
+        {
+          SOURCES.map((s) => (
+            <li>
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener"
+                class="font-semibold text-[var(--color-ink)] underline decoration-[var(--color-accent-soft)] underline-offset-2 hover:decoration-[var(--color-accent)]"
+              >
+                {s.label}
+              </a>
+              <p class="mt-1 text-[0.88rem] leading-[1.5] text-[var(--color-muted)]">{s.note}</p>
+            </li>
+          ))
+        }
+      </ul>
     </section>
 
     <!-- Footer -->
@@ -177,6 +210,7 @@ export const prerender = true;
     pass: { icon: '✓', color: 'var(--color-pass)', label: 'Pass' },
     warn: { icon: '!', color: 'var(--color-warn)', label: 'Improve' },
     fail: { icon: '✕', color: 'var(--color-fail)', label: 'Fix' },
+    info: { icon: 'i', color: 'var(--color-muted)', label: 'Note' },
   };
 
   function esc(s: string): string {
@@ -200,7 +234,7 @@ export const prerender = true;
   function renderCheck(check: Check): string {
     const s = STATUS[check.status];
     const fix =
-      check.status === 'pass'
+      check.status === 'pass' || check.status === 'info'
         ? ''
         : `<p class="check-fix mt-2 pl-3 text-[0.9rem] leading-[1.5] text-[var(--color-ink-soft)]">
              <span class="font-semibold text-[var(--color-ink)]">Fix:</span> ${esc(check.fix)}

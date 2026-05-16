@@ -2,8 +2,8 @@
 
 A free tool that audits how visible a website is to AI answer engines —
 ChatGPT, Perplexity, Google AI Overviews, Copilot. Enter a URL, get a scored
-report on crawler access, structured data, and content extractability, with a
-concrete fix for every issue.
+report on crawler access, structured data, content extractability, and agent
+readiness, with a concrete fix for every issue.
 
 A **kant.dev product**. The intended role: a free, shareable tool that
 demonstrates AI/SEO expertise and feeds inbound — see `kant.dev/products`.
@@ -19,12 +19,18 @@ and `sitemap.xml`, then inspects the markup. No API keys, no model calls.
 
 | Category | Checks |
 | --- | --- |
-| **AI crawler access** | robots.txt rules for GPTBot / OAI-SearchBot / ClaudeBot / PerplexityBot / Google-Extended / Applebot-Extended / Amazonbot; `llms.txt`; discoverable XML sitemap |
+| **AI crawler access** | robots.txt rules for GPTBot / OAI-SearchBot / ClaudeBot / PerplexityBot / Google-Extended / Applebot-Extended / Amazonbot; `noindex` indexability; discoverable XML sitemap; `llms.txt` (informational) |
 | **Structured data** | JSON-LD present & valid; Organization/Person entity schema; WebSite schema; `sameAs` entity-graph links |
 | **Content & extractability** | title, meta description, single H1, heading structure, canonical, Open Graph tags, substantive server-rendered text |
+| **Agent readiness** | semantic landmarks (`<main>`/`<nav>`); real `<a href>`/`<button>` controls; labelled form fields; image `alt` text |
 
 Each check returns pass / improve / fix, with a per-category and overall score
-(0–100, weighted).
+(0–100, weighted). The audit follows Google's [AI optimization
+guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide)
+and the Chrome team's [agent-friendly UX
+guidance](https://web.dev/articles/ai-agent-site-ux) — including Google's
+position that `llms.txt` is **not** required, so that check is shown as an
+informational note and does not affect the score.
 
 ## Tech
 
