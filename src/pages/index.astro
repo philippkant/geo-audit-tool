@@ -1,12 +1,25 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE_TAGLINE, PARENT } from '../consts';
+import { SITE_TAGLINE, PARENT, CTA } from '../consts';
 
 // Homepage is static — only /api/audit runs on demand.
 export const prerender = true;
 ---
 
 <BaseLayout>
+  <header class="border-b border-[var(--color-rule)] bg-[var(--color-paper-soft)]">
+    <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-3.5">
+      <a
+        href={PARENT.url}
+        class="font-display text-[1.1rem] text-[var(--color-ink)] transition-colors hover:text-[var(--color-accent)]"
+        >{PARENT.name}</a
+      >
+      <span class="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-[var(--color-muted)]">
+        AI Visibility Audit
+      </span>
+    </div>
+  </header>
+
   <main class="mx-auto max-w-3xl px-6 py-14 sm:py-20">
     <!-- Hero -->
     <section class="rise">
@@ -76,6 +89,25 @@ export const prerender = true;
       </div>
     </section>
 
+    <!-- CTA (hidden once a result is shown — the result carries its own) -->
+    <section
+      id="cta"
+      class="mt-14 rounded-2xl border border-[var(--color-accent-soft)] bg-[var(--color-accent-tint)] p-7 sm:p-8"
+    >
+      <h2 class="font-display text-[1.4rem] text-[var(--color-ink)]">Need help fixing it?</h2>
+      <p class="mt-2 max-w-xl text-[0.98rem] leading-[1.55] text-[var(--color-ink-soft)]">
+        kant.dev is a technical partner for AI, MDM/PIM and business automation. We get
+        sites found, understood and cited by AI answer engines.
+      </p>
+      <a
+        href={CTA.url}
+        class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-[var(--color-accent)] px-6 py-3 text-[0.98rem] font-semibold text-white transition-colors hover:bg-[var(--color-accent-hover)]"
+      >
+        {CTA.label}
+        <span aria-hidden="true">→</span>
+      </a>
+    </section>
+
     <!-- Footer -->
     <footer class="mt-16 border-t border-[var(--color-rule)] pt-6 text-[0.88rem] text-[var(--color-muted)]">
       <p>
@@ -130,6 +162,7 @@ export const prerender = true;
 
 <script>
   import type { AuditResult, Category, Check, CheckStatus } from '../lib/audit';
+  import { CTA } from '../consts';
 
   const form = document.getElementById('audit-form') as HTMLFormElement;
   const input = document.getElementById('url-input') as HTMLInputElement;
@@ -138,6 +171,7 @@ export const prerender = true;
   const errorEl = document.getElementById('form-error') as HTMLParagraphElement;
   const results = document.getElementById('results') as HTMLElement;
   const explainer = document.getElementById('explainer') as HTMLElement;
+  const cta = document.getElementById('cta') as HTMLElement;
 
   const STATUS: Record<CheckStatus, { icon: string; color: string; label: string }> = {
     pass: { icon: '✓', color: 'var(--color-pass)', label: 'Pass' },
@@ -220,9 +254,20 @@ export const prerender = true;
         </div>
       </div>
       ${r.categories.map(renderCategory).join('')}
-      <p class="mt-8 text-[0.88rem] text-[var(--color-muted)]">
-        This is a technical, deterministic audit. It does not yet test whether an AI model
-        already knows your brand — that is coming as a separate check.
+      <div class="mt-8 rounded-2xl border border-[var(--color-accent-soft)] bg-[var(--color-accent-tint)] p-6 sm:p-7">
+        <h3 class="font-display text-[1.3rem] text-[var(--color-ink)]">Want help fixing this?</h3>
+        <p class="mt-1.5 text-[0.95rem] leading-[1.55] text-[var(--color-ink-soft)]">
+          kant.dev is a technical partner for AI, MDM/PIM and business automation —
+          we get sites found, understood and cited by AI engines.
+        </p>
+        <a
+          href="${esc(CTA.url)}"
+          class="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[var(--color-accent)] px-5 py-3 text-[0.95rem] font-semibold text-white transition-colors hover:bg-[var(--color-accent-hover)]"
+        >${esc(CTA.label)} <span aria-hidden="true">→</span></a>
+      </div>
+      <p class="mt-4 text-[0.84rem] text-[var(--color-muted)]">
+        Deterministic technical audit. It does not yet test whether an AI model already
+        knows your brand — that check is coming separately.
       </p>`;
   }
 
@@ -267,6 +312,7 @@ export const prerender = true;
         return;
       }
       explainer.classList.add('hidden');
+      cta.classList.add('hidden');
       results.innerHTML = renderResult(data as AuditResult);
       results.classList.remove('hidden');
       results.scrollIntoView({ behavior: 'smooth', block: 'start' });

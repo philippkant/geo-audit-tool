@@ -11,3 +11,9 @@ export const PARENT = {
   name: 'kant.dev',
   url: 'https://kant.dev',
 };
+
+// Funnel target — high-intent visitors are routed to the kant.dev commercial page.
+export const CTA = {
+  url: 'https://kant.dev/work/',
+  label: 'Book a call',
+};
